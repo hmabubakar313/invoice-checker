@@ -1,7 +1,6 @@
 import logging
 
 from langgraph.graph import StateGraph, START, END
-
 from core.services import tool as tools
 from core.services.extract import extract_invoice_fields
 from core.services.state import (
@@ -13,6 +12,12 @@ from core.services.state import (
     retry_node,
     rules_node,
 )
+from langgraph.checkpoint.sqlite import SqliteSaver
+import sqlite3
+
+conn = sqlite3.connect("langgraph_checkpoints.sqlite", check_same_thread=False)
+checkpointer = SqliteSaver(conn)
+
 
 
 REQUIRED_FIELDS = ("amount", "vendor", "date")
@@ -22,7 +27,6 @@ TOOL_REGISTRY = {
     "approve_invoice": lambda invoice_id, reason: tools.approve_invoice(invoice_id),
     "notify_manager": lambda invoice_id, reason: tools.notify_manager(invoice_id, reason),
 }
-
 
 def decide_and_act(document, text):
     fields = extract_invoice_fields(text)
@@ -76,8 +80,8 @@ def _build_graph():
         lambda state: "cap_hit" if state["retries"] >= 2 else "continue",
         {"cap_hit": END, "continue": "retrieve"},
     )
-
-    return builder.compile()
+    
+    return builder.compile(checkpointer=checkpointer)
 
 
 graph = _build_graph()
@@ -95,6 +99,9 @@ def run_agent(invoice_id, text):
         "status": "running",
     }
     logging.info(f"Starting agent for invoice {invoice_id}")
-    result = graph.invoke(initial_state)
+    result = graph.invoke(
+        initial_state,
+        config={"configurable": {"thread_id": f"invoice-{invoice_id}"}}
+    )
     logging.info(f"Finished agent for invoice {invoice_id} with decision: {result.get('decision')}")
     return result
