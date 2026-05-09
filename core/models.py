@@ -19,3 +19,14 @@ class Chunk(models.Model):
     document = models.ForeignKey(Document, on_delete=models.CASCADE)
     content = models.TextField()
     embedding_id = models.CharField(max_length=255)  # ID from vector DB
+
+
+class AgentRun(models.Model):
+    document = models.ForeignKey(Document, on_delete=models.CASCADE)
+
+    state = models.JSONField()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"AgentRun {self.id} - Doc {self.document.id}"

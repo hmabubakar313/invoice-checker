@@ -3,7 +3,7 @@ from core.services.generate import generate_answer
 
 
 def rag_pipeline(query):
-    docs = retrieve(query)
+    docs = retrieve(query)[0]
     context = "\n".join(docs)
 
     answer = generate_answer(context, query)
